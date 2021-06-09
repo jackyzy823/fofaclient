@@ -5,7 +5,8 @@ import time
 import urllib
 
 import requests
-
+from requests.packages.urllib3.util.retry import Retry
+from requests.adapters import HTTPAdapter
 
 class TokenInvalid(Exception):
     pass
@@ -25,13 +26,13 @@ class FofaClient(object):
         self.API_ENDPOINT = "https://api.fofa.so/v1"
         self.captcha_model_path = captcha_model_path
         self.proxies = proxies
-        self.session = requests.session()
-        self.session.proxies = proxies
         if user_agent:
             self.ua = user_agent
         else:
             self.ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:87.0) Gecko/20100101 Firefox/87.0"
-        self.session.headers.update({"User-Agent": self.ua})
+        
+        self.session =  self.__create_session()
+
 
     def __captcha(self,gif):
         import os
@@ -115,10 +116,16 @@ class FofaClient(object):
         return "".join([ CHARLIST[i] for i in output_data.argmax(axis = -1)[0]])
 
 
+    def __create_session(self):
+        s = requests.session()
+        retry = Retry(total=5, status_forcelist=[429, 500, 502, 503, 504],backoff_factor = 0.1)
+        s.mount("https",HTTPAdapter(max_retries= retry ))
+        s.proxies = self.proxies
+        s.headers.update({"User-Agent": self.ua})
+        return s
+
     def login(self , username,password, display_captcha_if_auto_failed = False):
-        tmp_session = requests.session()
-        tmp_session.proxies = self.proxies
-        tmp_session.headers.update({"User-Agent": self.ua})
+        tmp_session = self.__create_session()
         prelogin = tmp_session.get("https://i.nosec.org/login?service=https%3A%2F%2Ffofa.so%2Flogin")
         para = re.findall(r'''type="hidden" name="((?!authenticity_token).*?)".*value="(.*?)"''',prelogin.text)
         # authenticity_token from csrf-token not from  type="hidden" name="authenticity_token" 
@@ -156,6 +163,7 @@ class FofaClient(object):
             # "用户名或密码错误" in resp.text:
             # 您的登录请求没有包含有效的登录授权 recaptcha expire  after 2min maybe
             raise TokenInvalid("login failed")
+        tmp_session.close()
         return self
     
 
@@ -344,9 +352,10 @@ data{
     qbase64 will be modified (yes!)?  mode is dependes on the input "q" ,
     '''
     def stats(self, q , full = False):
-        resp = requests.get("https://fofa.so/result" , params = { "qbase64": base64.b64encode(q) ,"full": "true" if full else "false"})
-        params = re.findall(r'''url_key.*?:.*?"(.*?)"''')[0]
-        return self._get("/v1/search/stats",params)
+        with self.__create_session() as s:
+            resp = s.get("https://fofa.so/result" , params = { "qbase64": base64.b64encode(q.encode("utf-8")) ,"full": "true" if full else "false"})
+            params = re.findall(r'''url_key.*?:.*?"(.*?)"''',resp.text)[0].encode().decode("unicode_escape")
+            return self._get("/search/stats",params)
 
 
     def rules_all(self,keyword):
@@ -387,8 +396,34 @@ data{
     '''
     def rules(self,keyword, pn = 1, ps = 10 ):
         return self._get("/search/rules",params = { "keyword":keyword, "ps":ps , "pn":pn })
-        pass
 
+    # This api endpoint is not ready? always 403
+    def hosts_content(self, host):
+        return self._get("/search/hosts/content" , params = {"host":host})
+
+    # 1. in <div class="el-scrollbar__view"> 2. in window.__NUXT__ -> text
+    def hosts_content_old(self,host):
+        with self.__create_session() as s:
+            resp = s.get("https://fofa.so/result/website?host={}".format(host))
+            res = re.findall(r'''data:\[{text:\"(.*)\",list''' , resp.text)
+            if len(res) > 0:
+                return res[0].encode().decode("unicode_escape")
+            return None
+
+    # same as https://fofa.so/hosts/<host> only show port rule with asterisk
+    def hostinfo(self,host):
+        return self._get("/host/{}".format(host))
+
+    #show all port info , more useful than `hostinfo`
+    '''
+    Response
+    {'key': '<unique hash>', // maybe unique hash
+        'list': {'443': {'asn': xxx, ...}
+        'remain_count': 0, // what is this?
+        'title': '<host>'}
+    '''
+    def hostsinfo(self,host):
+        return self._get("/hosts/{}".format(host))
 
     '''the same as set-cookie userinfo and result of getrefreshtoken'''
     def me(self):
