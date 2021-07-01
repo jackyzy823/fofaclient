@@ -49,7 +49,8 @@ import fofaclient
 client = fofaclient.FofaClient(proxies =None).login("email","password")
 # or
 # client = fofaclient.FofaClient(proxies =None).login_with_refresh_token("eJ........")
-res , max_count = client.search_all("testquery",iterable = True)
+res , info = client.search_all("testquery",iterable = True)
+max_count = info["max_count"]
 max_count = client.search_count("testquery", full=True)
 stat = client.stats("testquery")
 me = client.me()

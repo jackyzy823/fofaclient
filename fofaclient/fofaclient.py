@@ -30,7 +30,9 @@ class FofaClient(object):
             self.ua = user_agent
         else:
             self.ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:87.0) Gecko/20100101 Firefox/87.0"
-        
+        self.username = None
+        self.password = None
+        self._display_captcha = False
         self.session =  self.__create_session()
 
 
@@ -156,6 +158,9 @@ class FofaClient(object):
             self.access_token = tmp_session.cookies['fofa_token']
             self._userinfo = json.loads(urllib.parse.unquote_plus(tmp_session.cookies['user']))
             self.refresh_token = tmp_session.cookies['refresh_token']
+            self.username = username
+            self.password = password
+            self._display_captcha = display_captcha_if_auto_failed
         elif "登录验证码错误" in resp.text:
             return self.login(username,password,display_captcha_if_auto_failed)
             pass
@@ -198,9 +203,6 @@ class FofaClient(object):
         mid = refresh_token.split(".")[1]
         mid_raw = json.loads(base64.b64decode(mid+'==') )# padding
         assert mid_raw["iss"] == "refresh"
-        t = time.time()
-        if t >= mid_raw["exp"]:
-            raise TokenInvalid("refresh_token expired") 
         return self._get_unauth("/users/refresh", extra_headers = {"Authorization": refresh_token})
 
     def search_count(self,q,full=False):
@@ -226,21 +228,31 @@ class FofaClient(object):
     but the next query is XHR and condition is quoted  "test" and asn!="1123"
     Tested: q in response will be modified automatically
 
+    Returns results, info
+        results max count of items of your level (list or iterable).
+        info dict keys:
+                    max_total: max count globally at any level (number)
+                    q: normalized query (string)
+                    full: full result or not (bool)
+                    mode: normal/extend
+                    is_ipq
+                    took
+
     '''
     def search_all(self , q , full=False , iterable = False):
         PAGE_SIZE , MAX_COUNT = self.__search_limit()
-        page_one = self.search(q,ps = PAGE_SIZE ,full = full)
-        max_total = page_one["page"]["total"]
+        pg1 = self.search(q,ps = PAGE_SIZE ,full = full)
+        max_total = pg1["page"]["total"]
+        info = {"max_total":max_total, "q": pg1["q"], "full": pg1["full"], "mode": pg1["mode"], "is_ipq": pg1["is_ipq"], "took": pg1["took"]}
         
         # mode , is_ipq   ..... infos
         total =  MAX_COUNT if max_total > MAX_COUNT else max_total
-
         if iterable:
             def _iter():
                 start = 2
-                for i in page_one["assets"]:
+                for i in pg1["assets"]:
                     yield i
-                yield_count = len(page_one["assets"])
+                yield_count = len(pg1["assets"])
                 while total - yield_count > 0:
                     page = self.search(q, pn = start , ps = PAGE_SIZE , full = full )
                     for i in  page["assets"]:
@@ -248,16 +260,16 @@ class FofaClient(object):
                     yield_count += len(page["assets"])
                     start += 1
                 pass
-            return _iter(), max_total
+            return _iter(), info
         else:
-            assets_all = page_one["assets"]
+            assets_all = pg1["assets"]
             start = 2
             while total - len(assets_all) > 0:
                 page = self.search(q, pn = start , ps = PAGE_SIZE , full = full )
                 assets_all += page["assets"]
                 start += 1
 
-            return assets_all , max_total
+            return assets_all , info
 
     '''
     Request:
@@ -443,10 +455,15 @@ data{
         pass
 
     def _get(self, path, params = None , extra_headers = None):
-        if self._is_token_valid(self.access_token):
-            res = self.trade_access_token_with_refresh_token(self.refresh_token)
-            self.access_token = res["access_token"]
-            self._userinfo = res["info"]
+        if not self._is_token_valid(self.access_token):
+            if self._is_token_valid(self.refresh_token):
+                res = self.trade_access_token_with_refresh_token(self.refresh_token)
+                self.access_token = res["access_token"]
+                self._userinfo = res["info"]
+            elif self.username is not None and self.password is not None:
+                self.login(self.username, self.password , self._display_captcha)
+            else:
+                raise TokenInvalid("refresh_token expired")
         headers = { "Authorization": self.access_token}
         if extra_headers:
             headers.update(extra_headers)
