@@ -243,7 +243,7 @@ class FofaClient(object):
         PAGE_SIZE , MAX_COUNT = self.__search_limit()
         pg1 = self.search(q,ps = PAGE_SIZE ,full = full)
         max_total = pg1["page"]["total"]
-        info = {"max_total":max_total, "q": pg1["q"], "full": pg1["full"], "mode": pg1["mode"], "is_ipq": pg1["is_ipq"], "took": pg1["took"]}
+        info = {"max_total":max_total, "q": pg1["q"], "mode": pg1["mode"], "is_ipq": pg1["is_ipq"], "took": pg1["took"]}
         
         # mode , is_ipq   ..... infos
         total =  MAX_COUNT if max_total > MAX_COUNT else max_total
