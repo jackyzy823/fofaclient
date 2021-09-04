@@ -27,8 +27,9 @@ setup(
 	install_requires=[
 		"requests[socks,security]~=2.25",
 		"Pillow~=8.2",
-		'tflite_runtime~=2.5;python_version<"3.9"',
-		'tensorflow~=2.5;python_version>="3.9"',
+                # from google-coral's own repo: https://google-coral.github.io/py-repo/
+		'tflite_runtime~=2.5;python_version<"3.10"',
+		'tensorflow~=2.5;python_version>="3.10"',
 		'importlib-resources>=1.0;python_version<"3.9"',
 	],
 	# no more work for pip 19+ https://pip.pypa.io/en/stable/news/#v19-0
