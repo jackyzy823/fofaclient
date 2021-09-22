@@ -275,3 +275,23 @@ js_md5=""
 == means absoultely equal
 
 More on `https://fofa.so/help_articles/list?id=8`
+
+
+`https://fofa.so/URL.json` 
+```
+{
+  "currEnv": "",
+  "dev": {
+    "protocal": "http",
+    "baseUrl": "http://dapi.fofa.so"
+  },
+  "test": {
+    "protocal": "https",
+    "baseUrl": "https://apibeta.fofa.so"
+  },
+  "product": {
+    "protocal": "https",
+    "baseUrl": "https://api.fofa.so"
+  }
+}
+```
