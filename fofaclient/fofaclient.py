@@ -247,6 +247,8 @@ class FofaClient(object):
         
         # mode , is_ipq   ..... infos
         total =  MAX_COUNT if max_total > MAX_COUNT else max_total
+        info["total"] = total
+
         if iterable:
             def _iter():
                 start = 2
