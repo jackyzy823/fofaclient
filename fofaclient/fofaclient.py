@@ -21,9 +21,10 @@ class FofaError(Exception):
 
 class FofaClient(object):
     """docstring for FofaClient"""
-    def __init__(self,proxies = None, user_agent =None , captcha_model_path = None):
+    def __init__(self, fofa_endpoint = "fofa.info" , fofa_api_endpoint = "api.fofa.info" , proxies = None, user_agent =None , captcha_model_path = None):
         super(FofaClient, self).__init__()
-        self.API_ENDPOINT = "https://api.fofa.so/v1"
+        self.API_ENDPOINT = "https://{}/v1".format(fofa_api_endpoint)
+        self.FOFA_ENDPOINT = "https://{}".format(fofa_endpoint)
         self.captcha_model_path = captcha_model_path
         self.proxies = proxies
         if user_agent:
@@ -128,7 +129,7 @@ class FofaClient(object):
 
     def login(self , username,password, display_captcha_if_auto_failed = False):
         tmp_session = self.__create_session()
-        prelogin = tmp_session.get("https://i.nosec.org/login?service=https%3A%2F%2Ffofa.so%2Flogin")
+        prelogin = tmp_session.get("https://i.nosec.org/login?service={}%2Flogin".format(urllib.parse.quote_plus(self.FOFA_ENDPOINT)))
         para = re.findall(r'''type="hidden" name="((?!authenticity_token).*?)".*value="(.*?)"''',prelogin.text)
         # authenticity_token from csrf-token not from  type="hidden" name="authenticity_token" 
         authenticity_token = re.findall(r'''"csrf-token".*?content="(.*?)"''',prelogin.text)[0]
@@ -367,7 +368,7 @@ data{
     '''
     def stats(self, q , full = False):
         with self.__create_session() as s:
-            resp = s.get("https://fofa.so/result" , params = { "qbase64": base64.b64encode(q.encode("utf-8")) ,"full": "true" if full else "false"})
+            resp = s.get("{}/result".format(self.FOFA_ENDPOINT) , params = { "qbase64": base64.b64encode(q.encode("utf-8")) ,"full": "true" if full else "false"})
             params = re.findall(r'''url_key.*?:.*?"(.*?)"''',resp.text)[0].encode().decode("unicode_escape")
             return self._get("/search/stats",params)
 
@@ -418,7 +419,7 @@ data{
     # 1. in <div class="el-scrollbar__view"> 2. in window.__NUXT__ -> text
     def hosts_content_old(self,host):
         with self.__create_session() as s:
-            resp = s.get("https://fofa.so/result/website?host={}".format(host))
+            resp = s.get("{}/result/website?host={}".format(self.FOFA_ENDPOINT,host))
             res = re.findall(r'''data:\[{text:\"(.*)\",list''' , resp.text)
             if len(res) > 0:
                 return res[0].encode().decode("unicode_escape")
