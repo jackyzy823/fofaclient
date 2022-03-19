@@ -129,7 +129,7 @@ class FofaClient(object):
 
     def login(self , username,password, display_captcha_if_auto_failed = False):
         tmp_session = self.__create_session()
-        prelogin = tmp_session.get("https://i.nosec.org/login?service={}%2Flogin".format(urllib.parse.quote_plus(self.FOFA_ENDPOINT)))
+        prelogin = tmp_session.get("https://i.nosec.org/login?service={}%2Ff_login".format(urllib.parse.quote_plus(self.FOFA_ENDPOINT)))
         para = re.findall(r'''type="hidden" name="((?!authenticity_token).*?)".*value="(.*?)"''',prelogin.text)
         # authenticity_token from csrf-token not from  type="hidden" name="authenticity_token" 
         authenticity_token = re.findall(r'''"csrf-token".*?content="(.*?)"''',prelogin.text)[0]
@@ -148,7 +148,7 @@ class FofaClient(object):
                 raise TokenInvalid("no captcha")
 
 
-        login_dict = {"username":username,"password":password , "_rucaptcha": captcha  ,"utf8": "✓" }
+        login_dict = { "username": username, "password": password, "_rucaptcha": captcha, "utf8": "✓", "fofa_service": "1" }
         for i in para:
             login_dict.update({i[0]:i[1]})
         login_dict["authenticity_token"] = authenticity_token
