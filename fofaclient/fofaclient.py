@@ -456,7 +456,10 @@ data{
     def me(self):
         # TODO: should we update userinfo?
         # maybe since API_KEY only from here
-        return self._get("/m/")
+        # UPDATE: since /m/ endpoint is gone with 404
+        #         we use /m/profile now which will result different data structure
+        #         data { coins ,apis, rules, pocs, and previosly info}
+        return self._get("/m/profile")
 
     def _is_token_valid(self,token):
         mid = token.split(".")[1]
