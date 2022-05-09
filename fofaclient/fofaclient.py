@@ -8,6 +8,10 @@ import requests
 from requests.packages.urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
 
+from Crypto.Signature import pkcs1_15
+from Crypto.Hash import SHA256
+from Crypto.PublicKey import RSA
+
 class TokenInvalid(Exception):
     pass
 
@@ -21,10 +25,13 @@ class FofaError(Exception):
 
 class FofaClient(object):
     """docstring for FofaClient"""
-    def __init__(self, fofa_endpoint = "fofa.info" , fofa_api_endpoint = "api.fofa.info" , proxies = None, user_agent =None , captcha_model_path = None):
+    DEFAULT_API_SECRET = '''-----BEGIN RSA PRIVATE KEY-----\nMIIEogIBAAKCAQEAv0xjefuBTF6Ox940ZqLLUFFBDtTcB9dAfDjWgyZ2A55K+VdG\nc1L5LqJWuyRkhYGFTlI4K5hRiExvjXuwIEed1norp5cKdeTLJwmvPyFgaEh7Ow19\nTu9sTR5hHxThjT8ieArB2kNAdp8Xoo7O8KihmBmtbJ1umRv2XxG+mm2ByPZFlTdW\nRFU38oCPkGKlrl/RzOJKRYMv10s1MWBPY6oYkRiOX/EsAUVae6zKRqNR2Q4HzJV8\ngOYMPvqkau8hwN8i6r0z0jkDGCRJSW9djWk3Byi3R2oSdZ0IoS+91MFtKvWYdnNH\n2Ubhlnu1P+wbeuIFdp2u7ZQOtgPX0mtQ263e5QIDAQABAoIBAD67GwfeTMkxXNr3\n5/EcQ1XEP3RQoxLDKHdT4CxDyYFoQCfB0e1xcRs0ywI1be1FyuQjHB5Xpazve8lG\nnTwIoB68E2KyqhB9BY14pIosNMQduKNlygi/hKFJbAnYPBqocHIy/NzJHvOHOiXp\ndL0AX3VUPkWW3rTAsar9U6aqcFvorMJQ2NPjijcXA0p1MlZAZKODO2wqidfQ487h\nxy0ZkriYVi419j83a1cCK0QocXiUUeQM6zRNgQv7LCmrFo2X4JEzlujEveqvsDC4\nMBRgkK2lNH+AFuRwOEr4PIlk9rrpHA4O1V13P3hJpH5gxs5oLLM1CWWG9YWLL44G\nzD9Tm8ECgYEA8NStMXyAmHLYmd2h0u5jpNGbegf96z9s/RnCVbNHmIqh/pbXizcv\nmMeLR7a0BLs9eiCpjNf9hob/JCJTms6SmqJ5NyRMJtZghF6YJuCSO1MTxkI/6RUw\nmrygQTiF8RyVUlEoNJyhZCVWqCYjctAisEDaBRnUTpNn0mLvEXgf1pUCgYEAy1kE\nd0YqGh/z4c/D09crQMrR/lvTOD+LRMf9lH+SkScT0GzdNIT5yuscRwKsnE6SpC5G\nySJFVhCnCBsQqq+ohsrXt8a99G7ePTMSAGK3QtC7QS3liDmvPBk6mJiLrKiRAZos\nvgPg7nTP8VuF0ZIKzkdWbGoMyNxVFZXovQ8BYxECgYBvCR9xGX4Qy6KiDlV18wNu\nElYkxVqFBBE0AJRg/u+bnQ9jWhi2zxLa1eWZgtss80c876I8lbkGNWedOVZioatm\nMFLC4bFalqyZWyO7iP7i60LKvfDJfkOSlDUu3OikahFOiqyG1VBz4+M4U500alIU\nAVKD14zTTZMopQSkgUXsoQKBgHd8RgiD3Qde0SJVv97BZzP6OWw5rqI1jHMNBK72\nSzwpdxYYcd6DaHfYsNP0+VIbRUVdv9A95/oLbOpxZNi2wNL7a8gb6tAvOT1Cvggl\n+UM0fWNuQZpLMvGgbXLu59u7bQFBA5tfkhLr5qgOvFIJe3n8JwcrRXndJc26OXil\n0Y3RAoGAJOqYN2CD4vOs6CHdnQvyn7ICc41ila/H49fjsiJ70RUD1aD8nYuosOnj\nwbG6+eWekyLZ1RVEw3eRF+aMOEFNaK6xKjXGMhuWj3A9xVw9Fauv8a2KBU42Vmcd\nt4HRyaBPCQQsIoErdChZj8g7DdxWheuiKoN4gbfK4W1APCcuhUA=\n-----END RSA PRIVATE KEY-----'''
+
+    def __init__(self, fofa_endpoint = "fofa.info" , fofa_api_endpoint = "api.fofa.info" , proxies = None, user_agent =None , captcha_model_path = None , api_secret = DEFAULT_API_SECRET):
         super(FofaClient, self).__init__()
         self.API_ENDPOINT = "https://{}/v1".format(fofa_api_endpoint)
         self.FOFA_ENDPOINT = "https://{}".format(fofa_endpoint)
+        self.API_SECRET = api_secret
         self.captcha_model_path = captcha_model_path
         self.proxies = proxies
         if user_agent:
@@ -349,7 +356,7 @@ data{
 
     '''
     def search(self,q , pn =1 , ps = 10 , full=False ):
-        params = { "q":q , "qbase64":base64.b64encode(q.encode("utf-8")) , "ps":ps , "pn":pn , "full": "true" if full else "false"}
+        params = { "q":q , "qbase64":base64.b64encode(q.encode("utf-8")).decode() , "ps":ps , "pn":pn , "full": "true" if full else "false"}
         data = self._get("/search", params)
         return data
 
@@ -365,11 +372,16 @@ data{
     qbase64=x&mode=normal&full=false&ts=x&app_id=9e9fb94330d97833acfbc041ee1a76793f1bc691&sign=E6
 
     qbase64 will be modified (yes!)?  mode is dependes on the input "q" ,
+    fields see https://fofa.info/static_pages/api_help
+            string with "," -> ip,title,...
     '''
-    def stats(self, q , full = False):
+    def stats(self, q ,fields = "", full = False):
         with self.__create_session() as s:
-            resp = s.get("{}/result".format(self.FOFA_ENDPOINT) , params = { "qbase64": base64.b64encode(q.encode("utf-8")) ,"full": "true" if full else "false"})
-            params = re.findall(r'''url_key.*?:.*?"(.*?)"''',resp.text)[0].encode().decode("unicode_escape")
+            #resp = s.get("{}/result".format(self.FOFA_ENDPOINT) , params = { "qbase64": base64.b64encode(q.encode("utf-8")) ,"full": "true" if full else "false"})
+            #params = re.findall(r'''url_key.*?:.*?"(.*?)"''',resp.text)[0].encode().decode("unicode_escape")
+
+            ## Now we have sign func 
+            params =  { "qbase64": base64.b64encode(q.encode("utf-8")).decode() ,"full": "true" if full else "false" , "fields": fields}
             return self._get("/search/stats",params)
 
 
@@ -457,6 +469,30 @@ data{
         return self.__get_impl(path, params, extra_headers)
         pass
 
+    def _sign(self, params):
+        param_str = ""
+        # TODO: can params's value be list/dict ?
+        for i in sorted(params.keys()):
+            if type(params[i]) == str and len(params[i]) == 0:
+                # skip key-value with empty value
+                # see javascript the String func: for (var r in e) String(e[r]) && (t[r] = e[r]);
+                continue
+            param_str += i 
+            if type(params[i]) == bool:
+                # because True/False in Python is capitalized.
+                # basically true/false is preproceessed in each callee function
+                # in case of i forgot to do so.
+                param_str += str(params[i]).lower()
+            elif type(params[i]) == bytes:
+                # in  case of i forgot to do so.
+                param_str += str(params[i].decode())
+            else:
+                param_str += str(params[i])
+        signature = pkcs1_15.new(RSA.import_key(self.API_SECRET)).sign(SHA256.new(param_str.encode()))
+        return base64.b64encode(signature).decode()
+
+
+
     def _get(self, path, params = None , extra_headers = None):
         if not self._is_token_valid(self.access_token):
             if self._is_token_valid(self.refresh_token):
@@ -467,6 +503,17 @@ data{
                 self.login(self.username, self.password , self._display_captcha)
             else:
                 raise TokenInvalid("refresh_token expired")
+        
+        # for stats?
+        # previously stats endpoint's param is string (which from page to get sign)
+        # since now we have sign function 
+        if type(params) is not str:
+            params = {} if params is None else params
+            if "ts" not in params:
+                params["ts"] = int(time.time()*1000)
+            params["sign"] = self._sign(params)
+            params["app_id"] = "9e9fb94330d97833acfbc041ee1a76793f1bc691"
+        
         headers = { "Authorization": self.access_token}
         if extra_headers:
             headers.update(extra_headers)
