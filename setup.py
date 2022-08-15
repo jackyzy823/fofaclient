@@ -28,15 +28,9 @@ setup(
 		"requests[socks,security]~=2.25",
         'pycryptodome',
 		"Pillow~=8.2",
-                # from google-coral's own repo: https://google-coral.github.io/py-repo/
 		'tflite_runtime~=2.5;python_version<"3.10"',
 		'tensorflow~=2.5;python_version>="3.10"',
 		'importlib-resources>=1.0;python_version<"3.9"'
-	],
-	# no more work for pip 19+ https://pip.pypa.io/en/stable/news/#v19-0
-	# https://stackoverflow.com/a/54793503
-	dependency_links=[
-		"https://google-coral.github.io/py-repo/"
 	],
 	extras_require={
 		"full": ["tensorflow~=2.5"]

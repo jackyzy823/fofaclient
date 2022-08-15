@@ -11,21 +11,26 @@
 	- fetch results via generator
 
 ## Install
-```bash
-pip install --extra-index-url https://google-coral.github.io/py-repo/ git+https://github.com/jackyzy823/fofaclient
 
+```bash
+pip install git+https://github.com/jackyzy823/fofaclient
 ```
+
+For full(tensorflow) install
+```bash
+pip install git+https://github.com/jackyzy823/fofaclient#egg=fofaclient[full]
+```
+
+
 if pip failed with 404 not found , please upgrade pip
 
 ## Requirements
 	1. Common
 		- Requests
+		- Pycrytodome
 	2. Using Model
 		- Pillow
-		- tflite_runtime or tensorflow
-
-			tflite_runtime via pip3 install --index-url https://google-coral.github.io/py-repo/ tflite_runtime
-			NOTE: python 3.9 is not supported
+		- tflite_runtime ( Not available in Python 3.10) or tensorflow
 	3. Training Model
 		- Pillow
 		- tensorflow
