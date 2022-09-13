@@ -40,6 +40,8 @@ class FofaClient(object):
             self.ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:87.0) Gecko/20100101 Firefox/87.0"
         self.username = None
         self.password = None
+        self.access_token = None
+        self.refresh_token = None
         self._display_captcha = False
         self.session =  self.__create_session()
 
@@ -165,7 +167,8 @@ class FofaClient(object):
         if resp.status_code == 200 and len(resp.history) >=1 and resp.history[0].status_code == 303:
             self.access_token = tmp_session.cookies['fofa_token']
             self._userinfo = json.loads(urllib.parse.unquote_plus(tmp_session.cookies['user']))
-            self.refresh_token = tmp_session.cookies['refresh_token']
+            # refresh_token no more exist in Cookie and anywhere else.
+            #self.refresh_token = tmp_session.cookies['refresh_token']
             self.username = username
             self.password = password
             self._display_captcha = display_captcha_if_auto_failed
@@ -462,6 +465,8 @@ data{
         return self._get("/m/profile")
 
     def _is_token_valid(self,token):
+        if not token or len(token) == 0:
+            return False
         mid = token.split(".")[1]
         mid_raw = json.loads(base64.b64decode(mid+'==') )# padding 
 
